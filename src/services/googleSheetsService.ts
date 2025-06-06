@@ -239,5 +239,37 @@ class GoogleSheetsService {
   }
 }
 
+export async function saveUserMonthDataToSheets(email: string, month: number, data: any) {
+  try {
+    const response = await fetch('/api/saveUserMonthData', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, month, data }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao salvar dados na planilha');
+    }
+  } catch (error) {
+    console.error('Erro ao salvar dados:', error);
+  }
+}
+
+export async function loadUserMonthDataFromSheets(email: string, month: number) {
+  try {
+    const response = await fetch(`/api/getUserMonthData?email=${email}&month=${month}`);
+
+    if (!response.ok) {
+      throw new Error('Erro ao carregar dados da planilha');
+    }
+
+    const result = await response.json();
+    return result.data; // ou conforme a estrutura retornada
+  } catch (error) {
+    console.error('Erro ao carregar dados:', error);
+    return null;
+  }
+}
+
 export const googleSheetsService = new GoogleSheetsService();
 export type { UserData, DailySalesSheetData };
