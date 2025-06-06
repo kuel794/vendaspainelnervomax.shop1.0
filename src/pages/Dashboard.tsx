@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { 
   DollarSign, 
   TrendingUp, 
@@ -18,14 +18,12 @@ import SalesPieChart from '../components/charts/SalesPieChart';
 import SalesTable from '../components/SalesTable';
 import MonthlySummary from '../components/MonthlySummary';
 import GoogleSheetsStatus from '../components/GoogleSheetsStatus';
-import { useAuth } from '../hooks/useAuth';
-import { useGoogleSheets } from '../hooks/useGoogleSheets';
+import { AuthContext } from '@/contexts/AuthContext';
 import { getMonthData, saveMonthData, calculateMonthSummary } from '../utils/storageUtils';
 import { MonthData, DailySalesData, DateRange } from '../types';
 
 const Dashboard = () => {
-  const { user } = useAuth();
-  const { isConnected } = useGoogleSheets();
+  const { user } = useContext(AuthContext);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(2025);
   const [monthData, setMonthData] = useState<MonthData | null>(null);
@@ -35,11 +33,11 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
-    if (user) {
-      const data = getMonthData(user.id, selectedMonth, selectedYear);
+    if (user?.email) {
+      const data = getMonthData(user.email, selectedMonth);
       setMonthData(data);
     }
-  }, [user, selectedMonth, selectedYear]);
+  }, [user, selectedMonth]);
 
   const handleMonthChange = (month: number) => {
     setSelectedMonth(month);
@@ -54,7 +52,7 @@ const Dashboard = () => {
   };
 
   const handleUpdateDailySales = async (day: number, data: DailySalesData) => {
-    if (!user || !monthData) return;
+    if (!user?.email || !monthData) return;
 
     const updatedMonthData = {
       ...monthData,
@@ -66,9 +64,7 @@ const Dashboard = () => {
 
     const calculatedData = calculateMonthSummary(updatedMonthData);
     setMonthData(calculatedData);
-    
-    // Salvar dados (incluindo sincronização com Google Sheets)
-    await saveMonthData(user.id, calculatedData);
+    saveMonthData(user.email, selectedMonth, calculatedData);
   };
 
   if (!monthData) {
@@ -79,7 +75,6 @@ const Dashboard = () => {
     );
   }
 
-  // Prepare chart data
   const dailySalesChartData = Object.entries(monthData.dailySales).map(([day, data]) => ({
     day: Number(day),
     sales: data,
@@ -108,7 +103,7 @@ const Dashboard = () => {
             Acompanhe suas vendas e desempenho em tempo real
           </p>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row gap-2">
           <MonthSelector
             selectedMonth={selectedMonth}
@@ -123,11 +118,10 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Status do Google Sheets */}
       <GoogleSheetsStatus />
-      
+
       <MonthlySummary monthData={monthData} />
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SalesLineChart
           data={dailySalesChartData}
@@ -138,7 +132,7 @@ const Dashboard = () => {
           title="Distribuição de Receita"
         />
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SalesPieChart
           data={salesDistributionData}
@@ -160,7 +154,7 @@ const Dashboard = () => {
                 step="0.01"
                 value={monthData.taxPercentage}
                 onChange={async (e) => {
-                  if (!user) return;
+                  if (!user?.email) return;
                   const taxPercentage = parseFloat(e.target.value) || 0;
                   const updatedData = {
                     ...monthData,
@@ -168,7 +162,7 @@ const Dashboard = () => {
                   };
                   const calculatedData = calculateMonthSummary(updatedData);
                   setMonthData(calculatedData);
-                  await saveMonthData(user.id, calculatedData);
+                  saveMonthData(user.email, selectedMonth, calculatedData);
                 }}
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               />
@@ -182,30 +176,23 @@ const Dashboard = () => {
                 min="0"
                 max="31"
                 value={monthData.daysActive}
-                onChange={async (e) => {
-                  if (!user) return;
+                onChange={(e) => {
+                  if (!user?.email) return;
                   const daysActive = parseInt(e.target.value) || 0;
                   const updatedData = {
                     ...monthData,
                     daysActive,
                   };
                   setMonthData(updatedData);
-                  await saveMonthData(user.id, updatedData);
+                  saveMonthData(user.email, selectedMonth, updatedData);
                 }}
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               />
             </div>
-            {isConnected && (
-              <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-md">
-                <p className="text-sm text-green-700 dark:text-green-300">
-                  ✓ Dados sendo sincronizados automaticamente com Google Sheets
-                </p>
-              </div>
-            )}
           </div>
         </div>
       </div>
-      
+
       <div>
         <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
           Dados Diários
